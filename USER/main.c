@@ -1,3 +1,4 @@
+#if 0
 #include "led.h"
 #include "delay.h"
 #include "sys.h"
@@ -14,7 +15,15 @@
 #include "sim800c.h"	
 #include "touch.h"	
 #include "usart2.h"	
-
+#else
+#include "led.h"
+#include "delay.h"
+#include "sys.h"
+#include "usart.h"
+#include "key.h"
+#include "sim800c.h"	
+#include "usart2.h"	
+#endif
 /************************************************
  ALIENTEK Mini STM32开发板 扩展实验17
  ATK-SIM800C GSM/GPRS模块测试实验  
@@ -24,7 +33,7 @@
  广州市星翼电子科技有限公司  
  作者：正点原子 @ALIENTEK
 ************************************************/
- 
+ #if 0
  int main(void)
  { 
 	u8 key,fontok=0; 
@@ -78,4 +87,16 @@
 	sim800c_test();                 //GSM测试
 }
 
+#else
 
+int main(void)
+{
+	NVIC_Configuration();	 
+	delay_init();	    	         //延时函数初始化	  
+	uart_init(115200);	 	         //串口初始化为9600	
+	LED_Init();         	         //LED初始化	 
+	KEY_Init();				         //按键初始化	  													    
+ 	USART2_Init(115200);	         //初始化串口2 
+ 	sim800c_test();                 //GSM测试
+}
+#endif

@@ -1,3 +1,4 @@
+#if 0
 #include "sim800c.h"
 #include "usart.h"		
 #include "delay.h"	
@@ -11,6 +12,15 @@
 #include "text.h"		
 #include "usart2.h" 
 #include "ff.h"
+#else
+#include "sim800c.h"
+#include "usart.h"		
+#include "delay.h"	
+#include "led.h"   	 
+#include "key.h"	 	 	 	 	 
+#include "string.h"    
+#include "usart2.h" 
+#endif
 //////////////////////////////////////////////////////////////////////////////////	 
 //本程序只供学习使用，未经作者许可，不得用于其它任何用途
 //ALIENTEK STM32开发板
@@ -128,7 +138,7 @@ u8 sim800c_wait_request(u8 *request ,u16 waittime)
 	 }
 	 return res;
 }
-
+#if 0
 //将1个字符转换为16进制数字
 //chr:字符,0~9/A~F/a~F
 //返回值:chr对应的16进制数值
@@ -433,9 +443,10 @@ u8 sim800c_call_test(void)
 	myfree(p1);
 	return 0;
 }
+#endif
 ////////////////////////////////////////////////////////////////////////////////////////////// 
 //短信测试部分代码
-
+#if 0
 //SIM800C读短信测试
 void sim800c_sms_read_test(void)
 { 
@@ -687,10 +698,13 @@ u8 sim800c_sms_test(void)
 	sim800c_send_cmd("AT+CSCS=\"GSM\"","OK",200);				//设置默认的GSM 7位缺省字符集
 	return 0;
 } 
+#endif
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //GPRS测试部分代码
 
 const u8 *modetbl[2]={"TCP","UDP"};//连接模式
+#if 0
 //tcp/udp测试
 //带心跳功能,以维持连接
 //mode:0:TCP测试;1,UDP测试)
@@ -817,7 +831,105 @@ void sim800c_tcpudp_test(u8 mode,u8* ipaddr,u8* port)
 	myfree(p);
 	myfree(p1);
 }
+#else
+//tcp/udp测试
+//带心跳功能,以维持连接
+//mode:0:TCP测试;1,UDP测试)
+//ipaddr:ip地址
+//port:端口 
+void sim800c_tcpudp_test(u8 mode, const u8* ipaddr, const u8* port)
+{ 
+	u8 i=0;
+	u8 p[100] = {0};
+	u8 p1[100] = {0};
+	
+	u8 *p2,*p3;
+
+	u16 timex=0;
+	u8 count=0;
+	
+	u8 connectsta=0;			//0,正在连接;1,连接成功;2,连接关闭; 
+	u8 hbeaterrcnt=0;			//心跳错误计数器,连续5次心跳信号无应答,则重新连接
+
+	sprintf((char*)p,"IP地址:%s 端口:%s",ipaddr,port);
+
+	USART2_RX_STA=0;
+	sprintf((char*)p,"AT+CIPSTART=\"%s\",\"%s\",\"%s\"",modetbl[mode],ipaddr,port);
+	if(sim800c_send_cmd(p,"OK",500))return;		//发起连接
+	while(1)
+	{ 
+
+		if(connectsta==1 && sim800c_send_cmd("AT+CIPSEND",">",500)==0)		//发送数据
+		{ 
+				//printf("CIPSEND DATA:%s\r\n",p1);	 			//发送数据打印到串口
+			u2_printf("%s\r\n",p1);
+			delay_ms(50);
+			sim800c_send_cmd((u8*)0X1A,"SEND OK",1000);//最长等待10s
+			delay_ms(500); 
+		}else sim800c_send_cmd((u8*)0X1B,0,0);	//ESC,取消发送 
+
+		if((timex%20)==0)
+		{
+			LED0=!LED0;
+			count++;	
+			if(connectsta==2||hbeaterrcnt>8)//连接中断了,或者连续8次心跳没有正确发送成功,则重新连接
+			{
+				sim800c_send_cmd("AT+CIPCLOSE=1","CLOSE OK",500);	//关闭连接
+				sim800c_send_cmd("AT+CIPSHUT","SHUT OK",500);		//关闭移动场景 
+				sim800c_send_cmd(p,"OK",500);						//尝试重新连接
+				connectsta=0;	
+ 				hbeaterrcnt=0;
+			}
+			sprintf((char*)p1,"ATK-SIM800C %s测试 %d  ",modetbl[mode],count);
+		}
+		if(connectsta==0&&(timex%200)==0)//连接还没建立的时候,每2秒查询一次CIPSTATUS.
+		{
+			sim800c_send_cmd("AT+CIPSTATUS","OK",500);	//查询连接状态
+			if(strstr((const char*)USART2_RX_BUF,"CLOSED"))connectsta=2;
+			if(strstr((const char*)USART2_RX_BUF,"CONNECT OK"))connectsta=1;
+		}
+		if(connectsta==1&&timex>=600)//连接正常的时候,每6秒发送一次心跳
+		{
+			timex=0;
+			if(sim800c_send_cmd("AT+CIPSEND",">",200)==0)//发送数据
+			{
+				sim800c_send_cmd((u8*)0X00,0,0);	//发送数据:0X00  
+				delay_ms(40);						//必须加延时
+				sim800c_send_cmd((u8*)0X1A,0,0);	//CTRL+Z,结束数据发送,启动一次传输	
+			}else sim800c_send_cmd((u8*)0X1B,0,0);	//ESC,取消发送 		
+				
+			hbeaterrcnt++; 
+			printf("hbeaterrcnt:%d\r\n",hbeaterrcnt);//方便调试代码
+		} 
+		delay_ms(10);
+		if(USART2_RX_STA&0X8000)		//接收到一次数据了
+		{ 
+			USART2_RX_BUF[USART2_RX_STA&0X7FFF]=0;	//添加结束符 
+			printf("%s",USART2_RX_BUF);				//发送到串口  
+			if(hbeaterrcnt)							//需要检测心跳应答
+			{
+				if(strstr((const char*)USART2_RX_BUF,"SEND OK"))hbeaterrcnt=0;//心跳正常
+			}				
+			p2=(u8*)strstr((const char*)USART2_RX_BUF,"+IPD");
+			if(p2)//接收到TCP/UDP数据
+			{
+				p3=(u8*)strstr((const char*)p2,",");
+				p2=(u8*)strstr((const char*)p2,":");
+				p2[0]=0;//加入结束符
+				sprintf((char*)p1,"收到%s字节,内容如下",p3+1);//接收到的字节数
+			}
+			USART2_RX_STA=0;
+		}
+
+		timex++; 
+		i++;
+		if(i>10){i=0; u2_printf("AT\r\n");}//必须加上这句
+	} 
+}
+#endif
+
 //gprs测试主界面
+#if 0
 void sim800c_gprs_ui(void)
 {
 	LCD_Clear(WHITE);  
@@ -831,6 +943,9 @@ void sim800c_gprs_ui(void)
 	kbd_fn_tbl[1]="返回"; 
 	sim800c_load_keyboard(0,180,(u8**)kbd_tbl2);//显示键盘 
 } 
+#endif
+
+#if 0
 //sim800C GPRS测试
 //用于测试TCP/UDP连接
 //返回值:0,正常
@@ -900,9 +1015,47 @@ u8 sim800c_gprs_test(void)
 	}
 	return 0;
 }
+#else
+//sim800C GPRS测试
+//用于测试TCP/UDP连接
+//返回值:0,正常
+//其他,错误代码
+u8 sim800c_gprs_test(void)
+{
+	const u8 *url = "208l8w1838.51mypc.cn";
+	const u8 *port = "48438";
+	
+	u8 mode=0;				//0,TCP连接;1,UDP连接
+	u8 timex=0; 
+	
+ 	sim800c_send_cmd("AT+CIPCLOSE=1","CLOSE OK",100);	//关闭连接
+	sim800c_send_cmd("AT+CIPSHUT","SHUT OK",100);		//关闭移动场景 
+	if(sim800c_send_cmd("AT+CGCLASS=\"B\"","OK",1000))return 1;				//设置GPRS移动台类别为B,支持包交换和数据交换 
+	if(sim800c_send_cmd("AT+CGDCONT=1,\"IP\",\"CMNET\"","OK",1000))return 2;//设置PDP上下文,互联网接协议,接入点等信息
+	if(sim800c_send_cmd("AT+CGATT=1","OK",500))return 3;					//附着GPRS业务
+	if(sim800c_send_cmd("AT+CIPCSGP=1,\"CMNET\"","OK",500))return 4;	 	//设置为GPRS连接模式
+	if(sim800c_send_cmd("AT+CIPHEAD=1","OK",500))return 5;	 				//设置接收数据显示IP头(方便判断数据来源)
+	
+	while(timex && timex%19)
+	{
+		sim800c_tcpudp_test(mode,url,port);
+		timex++;
+		if(timex==20)
+		{
+			timex=0;
+			LED0=!LED0;
+		}
+		delay_ms(10);
+		sim_at_response(1);//检查GSM模块发送过来的数据,及时上传给电脑
+	}
+	return 0;
+}
+
+#endif
+
 /////////////////////////////////////////////////////////////////
 //蓝牙测试部分代码
-
+#if 0
 //蓝牙SPP测试主界面
 void sim800c_spp_ui(u16 x,u16 y)
 {
@@ -1176,9 +1329,10 @@ void sim800c_GB_test(void)
 	  }
 		
 }
+#endif
 ///////////////////////////////////////////////////////////////////// 
+#if 0
 //ATK-SIM800C GSM/GPRS主测试控制部分
-
 //测试界面主UI
 void sim800c_mtest_ui(u16 x,u16 y)
 {
@@ -1228,6 +1382,48 @@ void sim800c_mtest_ui(u16 x,u16 y)
 	}
 	myfree(p); 
 }
+#else
+//ATK-SIM800C GSM/GPRS主测试控制部分
+//测试界面主UI
+void sim800c_mtest_ui(u16 x,u16 y)
+{
+	u8 p[50] = {0};
+	u8 *p1,*p2;
+	
+	USART2_RX_STA=0;
+	if(sim800c_send_cmd("AT+CGMI","OK",200)==0)				//查询制造商名称
+	{ 
+		p1=(u8*)strstr((const char*)(USART2_RX_BUF+2),"\r\n");
+		p1[0]=0;//加入结束符
+		sprintf((char*)p,"制造商:%s",USART2_RX_BUF+2);
+		USART2_RX_STA=0;		
+	} 
+	if(sim800c_send_cmd("AT+CGMM","OK",200)==0)//查询模块名字
+	{ 
+		p1=(u8*)strstr((const char*)(USART2_RX_BUF+2),"\r\n"); 
+		p1[0]=0;//加入结束符
+		sprintf((char*)p,"模块型号:%s",USART2_RX_BUF+2);
+		USART2_RX_STA=0;		
+	} 
+	if(sim800c_send_cmd("AT+CGSN","OK",200)==0)//查询产品序列号
+	{ 
+		p1=(u8*)strstr((const char*)(USART2_RX_BUF+2),"\r\n");//查找回车
+		p1[0]=0;//加入结束符 
+		sprintf((char*)p,"序列号:%s",USART2_RX_BUF+2);
+		USART2_RX_STA=0;		
+	}
+	if(sim800c_send_cmd("AT+CNUM","+CNUM",200)==0)			//查询本机号码
+	{ 
+		p1=(u8*)strstr((const char*)(USART2_RX_BUF),",");
+		p2=(u8*)strstr((const char*)(p1+2),"\"");
+		p2[0]=0;//加入结束符
+		sprintf((char*)p,"本机号码:%s",p1+2);
+		USART2_RX_STA=0;		
+	}
+}
+#endif
+
+#if 0
 //GSM信息显示(信号质量,电池电量,日期时间)
 //返回值:0,正常
 //其他,错误代码
@@ -1282,6 +1478,59 @@ u8 sim800c_gsminfo_show(u16 x,u16 y)
 	myfree(p); 
 	return res;
 } 
+#else
+//GSM信息显示(信号质量,电池电量,日期时间)
+//返回值:0,正常
+//其他,错误代码
+u8 sim800c_gsminfo_show(u16 x,u16 y)
+{
+	u8 p[50] = {0};
+	u8 *p1, *p2;
+	u8 res=0;
+
+	USART2_RX_STA=0;
+	if(sim800c_send_cmd("AT+CPIN?","OK",200))res|=1<<0;	//查询SIM卡是否在位 
+	USART2_RX_STA=0;  
+	if(sim800c_send_cmd("AT+COPS?","OK",200)==0)		//查询运营商名字
+	{ 
+		p1=(u8*)strstr((const char*)(USART2_RX_BUF),"\""); 
+		if(p1)//有有效数据
+		{
+			p2=(u8*)strstr((const char*)(p1+1),"\"");
+			p2[0]=0;//加入结束符			
+			sprintf((char*)p,"运营商:%s",p1+1);
+		} 
+		USART2_RX_STA=0;		
+	}else res|=1<<1;
+	if(sim800c_send_cmd("AT+CSQ","+CSQ:",200)==0)		//查询信号质量
+	{ 
+		p1=(u8*)strstr((const char*)(USART2_RX_BUF),":");
+		p2=(u8*)strstr((const char*)(p1),",");
+		p2[0]=0;//加入结束符
+		sprintf((char*)p,"信号质量:%s",p1+2);
+		USART2_RX_STA=0;		
+	}else res|=1<<2;
+	if(sim800c_send_cmd("AT+CBC","+CBC:",200)==0)		//查询电池电量
+	{ 
+		p1=(u8*)strstr((const char*)(USART2_RX_BUF),",");
+		p2=(u8*)strstr((const char*)(p1+1),",");
+		p2[0]=0;p2[5]=0;//加入结束符
+		sprintf((char*)p,"电池电量:%s%%  %smV",p1+1,p2+1);
+		USART2_RX_STA=0;		
+	}else res|=1<<3; 
+	if(sim800c_send_cmd("AT+CCLK?","+CCLK:",200)==0)		//查询电池电量
+	{ 
+		p1=(u8*)strstr((const char*)(USART2_RX_BUF),"\"");
+		p2=(u8*)strstr((const char*)(p1+1),":");
+		p2[3]=0;//加入结束符
+		sprintf((char*)p,"日期时间:%s",p1+1);
+		USART2_RX_STA=0;		
+	}else res|=1<<4; 
+
+	return res;
+} 
+#endif
+
 //NTP网络同步时间
 void ntp_update(void)
 {  
@@ -1293,6 +1542,8 @@ void ntp_update(void)
 	 sim800c_send_cmd("AT+CNTP=\"202.120.2.101\",32","OK",200);     //设置NTP服务器和本地时区(32时区 时间最准确)
      sim800c_send_cmd("AT+CNTP","+CNTP: 1",600);                    //同步网络时间
 }
+
+#if 0
 //sim800C主测试程序
 void sim800c_test(void)
 {
@@ -1349,6 +1600,43 @@ void sim800c_test(void)
 	} 	
 }
 
+#else
+
+//sim800C主测试程序
+void sim800c_test(void)
+{
+	u8 timex=0;
+	u8 sim_ready=0;
+	
+	delay_ms(50);
+	while(sim800c_send_cmd("AT","OK",100))//检测是否应答AT指令 
+	{
+		delay_ms(1200);
+	} 	 
+	
+	sim800c_send_cmd("ATE0","OK",200);//不回显
+	sim800c_mtest_ui(40,30);
+	ntp_update();//网络同步时间
+	while(1)
+	{
+		delay_ms(10);
+		sim_at_response(1);//检查GSM模块发送过来的数据,及时上传给电脑
+		if(sim_ready)//SIM卡就绪.
+		{
+			sim800c_gprs_test();//GPRS测试
+			sim800c_mtest_ui(40,30);
+			timex=0;
+		}
+		if(timex==0 || sim_ready==0)		//2.5秒左右更新一次
+		{
+			if(sim800c_gsminfo_show(40,225)==0)sim_ready=1;
+			else sim_ready=0;
+		}	
+		if((timex%20)==0)LED0=!LED0;//200ms闪烁 
+		timex++;
+	} 	
+}
+#endif
 
 
 
