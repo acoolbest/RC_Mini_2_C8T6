@@ -16,13 +16,12 @@
 #include "touch.h"	
 #include "usart2.h"	
 #else
-#include "led.h"
-#include "delay.h"
 #include "sys.h"
+#include "delay.h"
+#include "led.h"
 #include "usart.h"
-#include "key.h"
-#include "sim800c.h"	
 #include "usart2.h"	
+#include "sim800c.h"
 #endif
 /************************************************
  ALIENTEK Mini STM32开发板 扩展实验17
@@ -93,9 +92,8 @@ int main(void)
 {
 	NVIC_Configuration();	 
 	delay_init();	    	         //延时函数初始化	  
-	uart_init(115200);	 	         //串口初始化为9600	
-	LED_Init();         	         //LED初始化	 
-	KEY_Init();				         //按键初始化	  													    
+	LED_Init();         	         //LED初始化	
+	uart_init(115200);	 	         //串口初始化为9600											    
  	USART2_Init(115200);	         //初始化串口2 
  	sim800c_test();                 //GSM测试
 }
