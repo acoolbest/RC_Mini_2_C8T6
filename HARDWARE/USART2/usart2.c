@@ -4,6 +4,7 @@
 #include "stdio.h"	 	 
 #include "string.h"
 #include "sim800c.h"
+#include "my_global.h"
 
 //////////////////////////////////////////////////////////////////////////////////	 
 //±æ≥Ã–Ú÷ªπ©—ßœ∞ π”√£¨Œ¥æ≠◊˜’ﬂ–Ìø…£¨≤ªµ√”√”⁄∆‰À¸»Œ∫Œ”√Õæ
@@ -36,9 +37,10 @@ u8 USART2_RX_BUF[USART2_MAX_RECV_LEN]; 				//Ω” ’ª∫≥Â,◊Ó¥ÛUSART2_MAX_RECV_LEN∏ˆ◊
 u16 USART2_RX_STA=0;   	 
 void USART2_IRQHandler(void)
 {
-	u8 res;	    
-if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)//Ω” ’µΩ ˝æ›
-	{	 
+	u8 res;
+	if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)//Ω” ’µΩ ˝æ›
+	{
+		LED0 = 0;
 		res =USART_ReceiveData(USART2);				 
 		if(USART2_RX_STA<USART2_MAX_RECV_LEN)		//ªπø…“‘Ω” ’ ˝æ›
 		{
@@ -120,30 +122,13 @@ void u2_printf(char* fmt,...)
 
 //∂® ±∆˜4÷–∂œ∑˛ŒÒ≥Ã–Ú		    
 void TIM4_IRQHandler(void)
-{ 
-	static u8 i=0;
-	
+{
 	if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)// «∏¸–¬÷–∂œ
 	{	 			   
 
-		TIM_ClearITPendingBit(TIM4, TIM_IT_Update  );  //«Â≥˝TIMx∏¸–¬÷–∂œ±Í÷æ    
-		if(Scan_Wtime!=0)//¿∂—¿…®√Ëƒ£ Ω
-		{
-		   i++;
-		   if(i==Scan_Wtime)
-		   {
-			  i=0;
-			  Scan_Wtime = 0;
-			  USART2_RX_STA|=1<<15;//÷±Ω”±Íº«Ω” ’≥…π¶
-			  TIM4_Set(0);	
-			  TIM4_SetARR(99);     //÷ÿ–¬…Ë÷√Œ™10ms÷–∂œ
-		   }
-		}
-		else//∑«¿∂—¿…®√Ëƒ£ Ω
-		{  
-			 USART2_RX_STA|=1<<15; //±Íº«Ω” ’ÕÍ≥…
-		     TIM4_Set(0);		   //πÿ±’TIM4  
-	  }
+		TIM_ClearITPendingBit(TIM4, TIM_IT_Update);  //«Â≥˝TIMx∏¸–¬÷–∂œ±Í÷æ    
+		USART2_RX_STA|=1<<15; //±Íº«Ω” ’ÕÍ≥…
+		TIM4_Set(0);		   //πÿ±’TIM4 
 	}   
 }
 //…Ë÷√TIM4µƒø™πÿ

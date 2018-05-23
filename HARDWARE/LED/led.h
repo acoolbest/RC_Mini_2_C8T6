@@ -1,6 +1,6 @@
 #ifndef __LED_H
 #define __LED_H	 
-#include "sys.h"
+#include "my_global.h"
 //////////////////////////////////////////////////////////////////////////////////	 
 //本程序只供学习使用，未经作者许可，不得用于其它任何用途
 //ALIENTEK战舰STM32开发板
@@ -13,8 +13,6 @@
 //Copyright(C) 广州市星翼电子科技有限公司 2009-2019
 //All rights reserved									  
 ////////////////////////////////////////////////////////////////////////////////// 
-#define LED0 PCout(13)	// PC13
-//#define LED1 PDout(2)	// PD2	
 
 void LED_Init(void);//初始化
 

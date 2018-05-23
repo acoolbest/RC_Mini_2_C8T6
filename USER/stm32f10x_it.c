@@ -23,7 +23,9 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f10x_it.h" 
+#include "my_global.h"
 
+extern void TimingDelay_Decrement(void);
 
  
 void NMI_Handler(void)
@@ -77,6 +79,9 @@ void PendSV_Handler(void)
  
 void SysTick_Handler(void)
 {
+	TimingDelay_Decrement();
+	time_sys++;
+	LED0 = 1;
 }
 
 /******************************************************************************/

@@ -90,11 +90,17 @@
 
 int main(void)
 {
-	NVIC_Configuration();	 
-	delay_init();	    	         //延时函数初始化	  
+	int i=1;
+	SysTick_Init();
 	LED_Init();         	         //LED初始化	
-	uart_init(115200);	 	         //串口初始化为9600											    
+	NVIC_Configuration();
+	//uart_init(115200);	 	         //串口初始化为9600											    
  	USART2_Init(115200);	         //初始化串口2 
+	delay_ms(0);					 //启动系统时钟
+	while(i)
+	{
+		sim_at_response(1);
+	}
  	sim800c_test();                 //GSM测试
 }
 #endif

@@ -44,11 +44,17 @@ u8 BT_Scan_mode=0;//蓝牙扫描设备模式标志
 //     1,清零USART2_RX_STA;
 void sim_at_response(u8 mode)
 {
+	static u8 *cmd = "sim_at_response";
 	if(USART2_RX_STA&0X8000)		//接收到一次数据了
 	{ 
 		USART2_RX_BUF[USART2_RX_STA&0X7FFF]=0;//添加结束符
-		printf("%s",USART2_RX_BUF);	//发送到串口
+		//printf("%s",USART2_RX_BUF);	//发送到串口
 		if(mode)USART2_RX_STA=0;
+		if((u32)cmd<=0XFF)
+		{
+			while(DMA1_Channel7->CNDTR!=0);	//等待通道7传输完成   
+			USART2->DR=(u32)cmd;
+		}else u2_printf("%s\r\n",cmd);//发送命令
 	} 
 }
 //////////////////////////////////////////////////////////////////////////////////
