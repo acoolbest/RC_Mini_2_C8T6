@@ -94,7 +94,7 @@ int main(void)
 	SysTick_Init();
 	LED_Init();         	         //LED初始化	
 	NVIC_Configuration();
-	//uart_init(115200);	 	         //串口初始化为9600											    
+	uart_init(115200);	 	         //串口初始化为9600											    
  	USART2_Init(115200);	         //初始化串口2 
 	delay_ms(0);					 //启动系统时钟
 	while(i)

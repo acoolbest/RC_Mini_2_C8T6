@@ -44,18 +44,25 @@ u8 BT_Scan_mode=0;//蓝牙扫描设备模式标志
 //     1,清零USART2_RX_STA;
 void sim_at_response(u8 mode)
 {
-	static u8 *cmd = "sim_at_response";
+	static u8 cmd1[] = "sim_at_response1";
+	static u8 cmd2[] = "sim_at_response2";
 	if(USART2_RX_STA&0X8000)		//接收到一次数据了
 	{ 
 		USART2_RX_BUF[USART2_RX_STA&0X7FFF]=0;//添加结束符
 		//printf("%s",USART2_RX_BUF);	//发送到串口
 		if(mode)USART2_RX_STA=0;
-		if((u32)cmd<=0XFF)
+		if((u32)cmd1<=0XFF)
 		{
 			while(DMA1_Channel7->CNDTR!=0);	//等待通道7传输完成   
-			USART2->DR=(u32)cmd;
-		}else u2_printf("%s\r\n",cmd);//发送命令
-	} 
+			USART2->DR=(u32)cmd1;
+		}else u2_printf("%s\r\n",cmd1);//发送命令
+	}
+	if(USART_RX_STA&0X8000)
+	{
+		USART_RX_BUF[USART_RX_STA&0X7FFF]=0;//添加结束符
+		if(mode)USART_RX_STA=0;
+		USART1SendString(cmd2, strlen((const char *)cmd2));
+	}
 }
 //////////////////////////////////////////////////////////////////////////////////
 //ATK-SIM800C 各项测试(拨号测试、短信测试、GPRS测试、蓝牙测试)共用代码
