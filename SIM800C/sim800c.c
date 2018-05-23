@@ -44,24 +44,33 @@ u8 BT_Scan_mode=0;//蓝牙扫描设备模式标志
 //     1,清零USART2_RX_STA;
 void sim_at_response(u8 mode)
 {
-	static u8 cmd1[] = "sim_at_response1";
-	static u8 cmd2[] = "sim_at_response2";
+	//static const char cmd1[] = "RECV_USART1:";
+	//static const char cmd2[] = "RECV_USART2:";
+	u16 len = 0;
+	if(USART_RX_STA&0X8000)
+	{
+		len = USART_RX_STA&0X7FFF;
+		USART_RX_BUF[len]=0;//添加结束符
+		if(mode)USART_RX_STA=0;
+		//USART1SendString((u8*)cmd1, strlen(cmd1));
+		USART1SendString(USART_RX_BUF, len);
+		
+	}
 	if(USART2_RX_STA&0X8000)		//接收到一次数据了
-	{ 
-		USART2_RX_BUF[USART2_RX_STA&0X7FFF]=0;//添加结束符
-		//printf("%s",USART2_RX_BUF);	//发送到串口
+	{
+		len = USART2_RX_STA&0X7FFF;
+		USART2_RX_BUF[len]=0;//添加结束符
 		if(mode)USART2_RX_STA=0;
+		#if 1
+		//USART2SendString((u8*)cmd2, strlen(cmd2));
+		USART2SendString(USART2_RX_BUF, len);
+		#else
 		if((u32)cmd1<=0XFF)
 		{
 			while(DMA1_Channel7->CNDTR!=0);	//等待通道7传输完成   
 			USART2->DR=(u32)cmd1;
 		}else u2_printf("%s\r\n",cmd1);//发送命令
-	}
-	if(USART_RX_STA&0X8000)
-	{
-		USART_RX_BUF[USART_RX_STA&0X7FFF]=0;//添加结束符
-		if(mode)USART_RX_STA=0;
-		USART1SendString(cmd2, strlen((const char *)cmd2));
+		#endif
 	}
 }
 //////////////////////////////////////////////////////////////////////////////////
@@ -78,6 +87,7 @@ u8* sim800c_check_cmd(u8 *str)
 	{ 
 		USART2_RX_BUF[USART2_RX_STA&0X7FFF]=0;//添加结束符
 		strx=strstr((const char*)USART2_RX_BUF,(const char*)str);
+		USART1SendString(USART2_RX_BUF, USART2_RX_STA&0X7FFF);
 	} 
 	return (u8*)strx;
 }
@@ -1039,7 +1049,7 @@ u8 sim800c_gprs_test(void)
 	const u8 *port = "48438";
 	
 	u8 mode=0;				//0,TCP连接;1,UDP连接
-	u8 timex=0; 
+	u8 timex=1; 
 	
  	sim800c_send_cmd("AT+CIPCLOSE=1","CLOSE OK",100);	//关闭连接
 	sim800c_send_cmd("AT+CIPSHUT","SHUT OK",100);		//关闭移动场景 
@@ -1634,10 +1644,11 @@ void sim800c_test(void)
 	{
 		delay_ms(10);
 		sim_at_response(1);//检查GSM模块发送过来的数据,及时上传给电脑
+		#if 1
 		if(sim_ready)//SIM卡就绪.
 		{
 			sim800c_gprs_test();//GPRS测试
-			sim800c_mtest_ui(40,30);
+			//sim800c_mtest_ui(40,30);
 			timex=0;
 		}
 		if(timex==0 || sim_ready==0)		//2.5秒左右更新一次
@@ -1647,6 +1658,7 @@ void sim800c_test(void)
 		}	
 		if((timex%20)==0)LED0=!LED0;//200ms闪烁 
 		timex++;
+		#endif
 	} 	
 }
 #endif

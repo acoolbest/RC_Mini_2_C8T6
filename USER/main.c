@@ -99,8 +99,8 @@ int main(void)
 	delay_ms(0);					 //启动系统时钟
 	while(i)
 	{
-		sim_at_response(1);
+		//sim_at_response(1);
+		sim800c_test();              //GSM测试
 	}
- 	sim800c_test();                 //GSM测试
 }
 #endif
